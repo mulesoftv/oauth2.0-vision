@@ -1,0 +1,177 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:sftp="http://www.mulesoft.org/schema/mule/sftp" xmlns:ftp="http://www.mulesoft.org/schema/mule/ftp"
+	xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+	xmlns:oauth2-provider="http://www.mulesoft.org/schema/mule/oauth2-provider" xmlns:os="http://www.mulesoft.org/schema/mule/os" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/os http://www.mulesoft.org/schema/mule/os/current/mule-os.xsd
+http://www.mulesoft.org/schema/mule/oauth2-provider http://www.mulesoft.org/schema/mule/oauth2-provider/current/mule-oauth2-provider.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+http://www.mulesoft.org/schema/mule/ftp http://www.mulesoft.org/schema/mule/ftp/current/mule-ftp.xsd
+http://www.mulesoft.org/schema/mule/sftp http://www.mulesoft.org/schema/mule/sftp/current/mule-sftp.xsd">
+	<http:listener-config name="HTTP_Listener_config" doc:name="HTTP Listener config" doc:id="0448e493-7f3c-49cb-942f-d6e6765d8cb3" >
+		<http:listener-connection host="0.0.0.0" port="8081" />
+	</http:listener-config>
+	<oauth2-provider:config name="OAuth2_Provider_Config" doc:name="OAuth2 Provider Config" doc:id="2bbb5171-ea3d-41e4-8ecb-abdd118859cc" listenerConfig="HTTP_Listener_config" clientStore="Object_store-OS" supportedGrantTypes="CLIENT_CREDENTIALS" >
+		<oauth2-provider:token-config tokenStore="Object_store-TO" />
+	</oauth2-provider:config>
+	<os:object-store name="Object_store-OS" doc:name="Object store" doc:id="739f5553-de62-4e0f-a80b-7d244a70f744" entryTtl="1" entryTtlUnit="MINUTES"/>
+	<os:object-store name="Object_store-TO" doc:name="Object store" doc:id="56aff21f-671f-4249-9a5d-ab03910b1e08" entryTtl="1" entryTtlUnit="MINUTES"/>
+	<http:request-config name="HTTP_Request_configuration" doc:name="HTTP Request configuration" doc:id="d08ee903-2b2b-4b07-92b3-63b88d32a95c" >
+		<http:request-connection host="vision-oauth.us-e2.cloudhub.io" />
+	</http:request-config>
+	<http:request-config name="Call-API_listener" doc:name="HTTP Request configuration" doc:id="0359c07d-d3f9-4729-ae53-31b846e291f5" >
+		<http:request-connection host="samplecheck.us-e2.cloudhub.io" />
+	</http:request-config>
+	<http:request-config name="call-api_TOKENreq" doc:name="HTTP Request configuration" doc:id="f0a44065-1d45-4a22-9486-e3cb8ad9011b" >
+		<http:request-connection host="vision-oauth.us-e2.cloudhub.io" />
+	</http:request-config>
+	<os:object-store name="Object_store-token-expires-5min" doc:name="Object store" doc:id="262f8660-398d-414b-9c1a-20054917c865" entryTtl="4" entryTtlUnit="MINUTES" />
+	<flow name="carona-oauth-2.0" doc:id="de8baba0-f948-40b4-a755-1f5fc53a22ff" >
+		<http:listener doc:name="Listener" doc:id="3f4b11d3-c7a7-462a-9d08-43680f4b2a04" config-ref="HTTP_Listener_config" path="/createClient" allowedMethods="POST"/>
+		<logger level="INFO" doc:name="Logger" doc:id="09fb4b05-4137-4450-bafa-60ebc3aa8fcb" message="request received to register  client_id and secret for API"/>
+		<ee:transform doc:name="Transform Message" doc:id="ef0d3094-14b9-40b4-b3b7-5d2c467642a5">
+			<ee:message>
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="ClientInfo" ><![CDATA[%dw 2.0
+output application/json
+---
+{
+	Client_id: attributes.headers."client_id",
+	Client_secret: attributes.headers."client_secret",
+	Client_name: attributes.headers."client_name"
+}]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<oauth2-provider:create-client doc:name="Create client" doc:id="0cd4f977-bc93-4ec5-875f-f18294608427" config-ref="OAuth2_Provider_Config" clientId="#[attributes.headers.client_id]" type="CONFIDENTIAL" secret="#[attributes.headers.client_secret]" clientName="#[attributes.headers.client_name]" authorizedGrantTypes='#[["CLIENT_CREDENTIALS"]]' failIfPresent="true" description='#[""]' principal='#[""]' redirectUris='#[["a.com"]]'/>
+		<set-payload value='#[vars.ClientInfo]' doc:name="Set Payload" doc:id="5d6e46b6-30cf-4e49-bc90-55199800ee19" />
+		<logger level="INFO" doc:name="Logger" doc:id="a7e1fa6b-7d45-46e0-8508-628d0c89ea2f" message="registered successfully -    vision Mule "/>
+		<error-handler >
+			<on-error-propagate enableNotifications="true" logException="true" doc:name="On Error Propagate" doc:id="7d069340-11ec-498c-ab88-766e13213374" >
+				<logger level="ERROR" doc:name="Logger" doc:id="9c57a487-54d0-46d0-ab6b-ffdc110bec17" message="error while registering client id and secret, pls try after some time "/>
+			</on-error-propagate>
+		</error-handler>
+	</flow>
+	<flow name="oauth-2.0Flow1" doc:id="1b9c532f-3fc2-450f-9d16-b34eac496d81" >
+		<http:listener doc:name="Listener" doc:id="5cabbc5a-baa9-4dc5-9817-37617d005389" config-ref="HTTP_Listener_config" path="/validateToken"/>
+		<logger level="INFO" doc:name="Logger" doc:id="5ef99604-98fe-48a1-a343-06095a20390b" message="hitted token validation end point"/>
+		<ee:transform doc:name="Transform Message" doc:id="1706b8b6-5bea-4382-a9e3-160d6e19461e" >
+			<ee:message >
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="Tokeninfo" ><![CDATA[%dw 2.0
+output application/json
+---
+{
+	
+	Client_id: attributes.headers.Authorization
+
+}]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<oauth2-provider:validate-token doc:name="Validate token" doc:id="ab7bcdd7-28cc-40ff-af20-9c0ffac1946a" config-ref="OAuth2_Provider_Config" accessToken="#[(attributes.headers.'Authorization' splitBy ' ')[1] as String]"/>
+		<ee:transform doc:name="Transform Message" doc:id="ed9feb0b-02cf-4a97-a40b-4845a95eb3a6" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+	
+	"TokenInfo": payload,
+	"Bearer token used": vars.Tokeninfo,
+	"info": "Authorized token successfully"
+	
+	
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<logger level="INFO" doc:name="Logger" doc:id="10a036c8-793c-419a-a847-7faa78470b9d" message="validated succesfully!!!!!!!"/>
+		<error-handler >
+			<on-error-propagate enableNotifications="true" logException="true" doc:name="On Error Propagate" doc:id="0a863d1f-ebd1-462e-aff9-751bc34d8403" >
+				<logger level="ERROR" doc:name="Logger" doc:id="fe0c87cf-a759-46ea-8c60-0d486f524041" message="error while validating token, please try after some time"/>
+				<flow-ref doc:name="Flow Reference" doc:id="56e46567-7c6e-441e-943a-28fac6cab8c0" name="oauthTokenGenerateFlow"/>
+			</on-error-propagate>
+		</error-handler>
+	</flow>
+	<flow name="oauthTokenGenerateFlow" doc:id="177e2da7-f8ea-44a4-bfc6-b4346cf3b8f8" >
+		<logger level="INFO" doc:name="Logger" doc:id="91da6284-aeae-440f-8a86-65efc1dbbdaa" message="registering client id n secret"/>
+		<ee:transform doc:name="Transform Message" doc:id="9c3de18c-c14d-431d-8400-5fa65698350f" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+	client_id: "HARI123",
+	client_secret: "HARI12344",
+	client_name: "HARYPOTTER"
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<http:request method="POST" doc:name="Request - to register clients" doc:id="0ca1b8c2-2ab9-46ac-9d1b-c791e8e0bc25" config-ref="HTTP_Request_configuration" path="/createClient" responseTimeout="200000">
+			<reconnect frequency="5000" count="10" />
+			<http:headers ><![CDATA[#[{
+	client_id: payload.client_id,
+	client_secret: payload.client_secret,
+	client_name: payload.client_name
+}]]]></http:headers>
+		</http:request>
+		<logger level="INFO" doc:name="Logger" doc:id="2c585fc6-9a48-4266-a666-f083e24b3544" message="hitted and registered client id,secret"/>
+		<http:request method="POST" doc:name="Request - Token Request Call" doc:id="28d984b0-4a77-411f-95aa-5feded95fc36" config-ref="call-api_TOKENreq" path="/token" responseTimeout="2000000">
+			<reconnect frequency="20000" count="20" />
+			<http:headers ><![CDATA[#[%dw 2.0
+output application/json
+---
+{
+	client_id: "HARI123",
+	client_secret: "HARI12344",
+	grant_type: "CLIENT_CREDENTIALS"
+}]]]></http:headers>
+		</http:request>
+		<ee:transform doc:name="Transform Message" doc:id="24de22fc-9c0d-4050-948f-57cf70ce721a" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload.access_token]]></ee:set-payload>
+			</ee:message>
+			<ee:variables >
+			</ee:variables>
+		</ee:transform>
+		<os:store doc:name="Store latest Token" doc:id="704396a9-8ff1-4949-8704-0c387223dbbf" key="OsTokenValue" objectStore="Object_store-token-expires-5min">
+		</os:store>
+		<logger level="INFO" doc:name="Logger" doc:id="d398f3d1-8d71-49f4-a25d-47a1ad45336a" message="fresh token value generated"/>
+	</flow>
+	<flow name="oauth-2.0Flow" doc:id="36ea8e3e-5f0e-4d61-963d-66e8dd3215c6" >
+		<http:listener doc:name="Listener" doc:id="9b75f82e-a9a2-4b75-bbfd-5fc8913b5a5a" config-ref="HTTP_Listener_config" path="/callApi"/>
+		<flow-ref doc:name="Flow Reference" doc:id="aac1ce62-4e36-4a1d-8133-9e9785644f2d" name="oauthValueReuse"/>
+		<http:request method="GET" doc:name="Request" doc:id="97eac89a-57c1-4ce2-8f23-30d9ef9f12ae" config-ref="Call-API_listener" path="/api/vision" responseTimeout="2000000">
+			<reconnect />
+			<http:body ><![CDATA[#[(vars.tokenValue)]]]></http:body>
+			<http:headers ><![CDATA[#[{
+	Authorization: "Bearer " ++ (payload)
+}]]]></http:headers>
+		</http:request>
+		<ee:transform doc:name="Transform Message" doc:id="cc5fbcf9-dca3-4956-8b5e-90f12a6404bf" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<logger level="INFO" doc:name="Logger" doc:id="805130d9-9663-4d5a-9739-3a5b113b3696" message="#[payload]"/>
+	</flow>
+	<flow name="oauthValueReuse" doc:id="98459526-14c6-481a-8797-83561b4f94e6" >
+		<logger level="INFO" doc:name="Logger" doc:id="fc6cadb5-c7e1-4b98-9cf3-fa1e7afa0dfd" message="===========started checking value in Object store to re use the Token value================"/>
+		<os:contains doc:name="checking if Token Value exist??????" doc:id="d3231cb6-912a-44c3-9816-7841a5d7f28e" key="OsTokenValue" objectStore="Object_store-token-expires-5min"/>
+		<choice doc:name="Choice" doc:id="dab6e3fb-5b55-4148-b32d-4ab0ce74d3e4" >
+			<when expression="#[payload as Boolean]">
+				<os:retrieve doc:name="Retrieve" doc:id="a73d1ac5-7a65-4581-b5f9-d21b06e05bb5" key="OsTokenValue" objectStore="Object_store-token-expires-5min"/>
+			</when>
+			<otherwise >
+				<flow-ref doc:name="Flow Reference" doc:id="b6eda2a3-e84e-4929-abd0-0f157d9babc4" name="oauthTokenGenerateFlow"/>
+			</otherwise>
+		</choice>
+	</flow>
+</mule>

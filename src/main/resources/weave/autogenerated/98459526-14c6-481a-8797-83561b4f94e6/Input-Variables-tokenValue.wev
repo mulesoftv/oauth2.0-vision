@@ -1,0 +1,6 @@
+%dw 2.0
+
+type auto_98459526_14c6_481a_8797_83561b4f94e6_Input_Variables_tokenValue = {|  |} {"typeAlias": "Object",
+"class": "java.lang.Object",
+"typeId": "java.lang.Object"}
+
